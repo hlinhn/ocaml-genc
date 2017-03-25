@@ -1,3 +1,3 @@
-FILES = typeExpr.ml corenode.ml declNode.ml schedule.ml sortNode.ml writeCode.ml entry.ml
+FILES = typeExpr.ml corenode.ml declNode.ml schedule.ml sortNode.ml parseDecl.ml writeCode.ml entry.ml
 %: %.ml
-	ocamlc -o $@ $(FILES) $<
+	ocamlfind ocamlc -linkpkg -package stdint,str -o $@ $(FILES) $<

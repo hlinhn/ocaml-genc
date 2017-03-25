@@ -18,6 +18,11 @@ type globalSt = { gRuleId:int;
                   gPeriod:int;
                   gPhase :int
                 }
+type pinMode =
+  | DIn of int
+  | DOut of int
+  | AIn of int
+  | AOut of int
                   
 type nodeDt = { nodeId     :int;
                 nodeName   :name;
@@ -27,7 +32,8 @@ type nodeDt = { nodeId     :int;
                 nodePeriod :int;
                 nodePhase  :int;
                 nodeAssigns:(uv * ue) list;
-                nodeActions:((string list -> string) * ue list) list
+                nodeActions:((string list -> string) * ue list) list;
+                nodeInout : (pinMode * uv) list
               }
                 
 type ruleDt = { ruleId     :int;
@@ -35,6 +41,7 @@ type ruleDt = { ruleId     :int;
                 ruleEn     :ue;
                 ruleAssigns:(uv * ue) list;
                 ruleActions:((string list -> string) * ue list) list;
+                ruleInout  :(pinMode * uv) list;
                 rulePeriod :int;
                 rulePhase  :int
               }
@@ -86,11 +93,14 @@ let addNode gstt name (Node a) =
        nodePeriod = gstt.gPeriod;
        nodePhase = gstt.gPhase;
        nodeAssigns = [];
-       nodeActions = [] }
+       nodeActions = [];
+       nodeInout = [] }
     )
 
 let rec createRules en nodedt =
-  let isRule = not (nodedt.nodeAssigns = [] && nodedt.nodeActions = []) in
+  let isRule = not (nodedt.nodeAssigns = []
+                    && nodedt.nodeActions = []
+                    && nodedt.nodeInout = []) in
   let () = match isRule with
     | true -> Printf.printf "%s: Period: %d Phase: %d\n" nodedt.nodeName nodedt.nodePeriod nodedt.nodePhase
     | false -> Printf.printf "%s: Empty\n" nodedt.nodeName in
@@ -102,6 +112,7 @@ let rec createRules en nodedt =
                ruleEn = enable;
                ruleActions = nodedt.nodeActions;
                ruleAssigns = List.map enAssigns nodedt.nodeAssigns;
+               ruleInout = nodedt.nodeInout;
                rulePeriod = nodedt.nodePeriod;
                rulePhase = nodedt.nodePhase
              } in
@@ -132,6 +143,6 @@ let combineNode name node =
             
 let allUEs r =
   r.ruleEn ::
-    (List.map (fun x -> snd x) r.ruleAssigns) @
-    (List.flatten (snd (List.split r.ruleActions)))
+    (List.map (fun x -> snd x) r.ruleAssigns)
+  @ (List.flatten (snd (List.split r.ruleActions)))                     
       

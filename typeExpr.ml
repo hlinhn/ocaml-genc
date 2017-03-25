@@ -1,9 +1,13 @@
+open Stdint
+       
 type etype =
-  | Bool | Int | Float
+  | Bool | Float | Int64 | Int32 | Int16 | Int8 | Int
+  | UInt64 | UInt32 | UInt16 | UInt8
                    
 type const =
-  | CBool of bool
-  | CInt of int 
+  | CBool of bool | CInt of int
+  | CInt64 of int64 | CInt32 of int32 | CInt16 of int16 | CInt8 of int8
+  | CWord64 of uint64 | CWord32 of uint32 | CWord16 of uint16 | CWord8 of uint8
   | CFloat of float
 
 module type TYPE = sig
@@ -20,8 +24,10 @@ module Type_const :
 TYPE with type t = const = struct
                  type t = const
                  let typeOfM : const -> etype = function
-                   | CBool _ -> Bool
-                   | CInt _ -> Int
+                   | CBool _ -> Bool | CInt _ -> Int
+                   | CInt64 _ -> Int64 | CInt32 _ -> Int32 | CInt16 _ -> Int16
+                   | CInt8 _ -> Int8 | CWord64 _ -> UInt64 | CWord32 _ -> UInt32
+                   | CWord16 _ -> UInt16 | CWord8 _ -> UInt8
                    | CFloat _ -> Float
                end
 let typeConst : const type_impl =
@@ -29,15 +35,17 @@ let typeConst : const type_impl =
 
     
 type _ typ =
-  | Int : int typ
-  | Bool : bool typ
+  | Int64 : int64 typ | Int32 : int32 typ | Int16 : int16 typ | Int8 : int8 typ
+  | UInt64 : uint64 typ | UInt32 : uint32 typ | UInt16 : uint16 typ | UInt8 : uint8 typ
+  | Bool : bool typ | Int : int typ
   | Float : float typ
                   
 let typeTag : type a. a typ -> etype =
   fun t ->
   match t with
-  | Int -> Int
-  | Float -> Float
+  | Int64 -> Int64 | Int32 -> Int32 | Int16 -> Int16 | Int8 -> Int8
+  | UInt64 -> UInt64 | UInt32 -> UInt32 | UInt16 -> UInt16 | UInt8 -> UInt8 
+  | Float -> Float | Int -> Int
   | Bool -> Bool 
               
 type ua =
@@ -128,8 +136,10 @@ let typeUE : ue type_impl =
     
 let constant : type a. a typ -> a -> const =
   fun t x -> match t with
-             | Int -> CInt x
-             | Bool -> CBool x
+             | Int64 -> CInt64 x | Int32 -> CInt32 x | Int16 -> CInt16 x
+             | Int8 -> CInt8 x | UInt64 -> CWord64 x | UInt32 -> CWord32 x
+             | UInt16 -> CWord16 x | UInt8 -> CWord8 x
+             | Bool -> CBool x | Int -> CInt x
              | Float -> CFloat x
                                
 let ubool (a : bool) = UConst (CBool a)
@@ -156,6 +166,14 @@ let ueq a b =
   else
     match a, b with
     | (UConst (CBool a), UConst (CBool b)) -> ubool (a == b)
+    | (UConst (CInt64 a), UConst (CInt64 b)) -> ubool (a == b)
+    | (UConst (CInt32 a), UConst (CInt32 b)) -> ubool (a == b)
+    | (UConst (CInt16 a), UConst (CInt16 b)) -> ubool (a == b)
+    | (UConst (CInt8 a), UConst (CInt8 b)) -> ubool (a == b)
+    | (UConst (CWord64 a), UConst (CWord64 b)) -> ubool (a == b)
+    | (UConst (CWord32 a), UConst (CWord32 b)) -> ubool (a == b)
+    | (UConst (CWord16 a), UConst (CWord16 b)) -> ubool (a == b)
+    | (UConst (CWord8 a), UConst (CWord8 b)) -> ubool (a == b)
     | (UConst (CInt a), UConst (CInt b)) -> ubool (a == b)
     | (UConst (CFloat a), UConst (CFloat b)) -> ubool (a == b)
     | _, _ -> UEq (a, b)
@@ -165,6 +183,14 @@ let ult a b =
   else
     match a, b with
     | (UConst (CBool a), UConst (CBool b)) -> ubool (a < b)
+    | (UConst (CInt64 a), UConst (CInt64 b)) -> ubool (a < b)
+    | (UConst (CInt32 a), UConst (CInt32 b)) -> ubool (a < b)
+    | (UConst (CInt16 a), UConst (CInt16 b)) -> ubool (a < b)
+    | (UConst (CInt8 a), UConst (CInt8 b)) -> ubool (a < b)
+    | (UConst (CWord64 a), UConst (CWord64 b)) -> ubool (a < b)
+    | (UConst (CWord32 a), UConst (CWord32 b)) -> ubool (a < b)
+    | (UConst (CWord16 a), UConst (CWord16 b)) -> ubool (a < b)
+    | (UConst (CWord8 a), UConst (CWord8 b)) -> ubool (a < b)
     | (UConst (CInt a), UConst (CInt b)) -> ubool (a < b)
     | (UConst (CFloat a), UConst (CFloat b)) -> ubool (a < b)
     | _, _ -> ULt (a, b)
@@ -195,15 +221,25 @@ let rec uecv : type a. a e -> ue = function
                                  | Pow (a, b) -> UPow ((uecv a), (uecv b))
                                                       
 let uvcv (V (v, _)) = v
-
+                        
 let cInt x = Const (Int, x)
+let cInt64 x = Const (Int64, Int64.of_int x)
+let cInt32 x = Const (Int32, Int32.of_int x)
+let cInt16 x = Const (Int16, Int16.of_int x)
+let cInt8 x = Const (Int8, Int8.of_int x)
+let cWord64 x = Const (UInt64, Uint64.of_int x)
+let cWord32 x = Const (UInt32, Uint32.of_int x)
+let cWord16 x = Const (UInt16, Uint16.of_int x)
+let cWord8 x = Const (UInt8, Uint8.of_int x)
 let cBool x = Const (Bool, x)
 let cFloat x = Const (Float, x)
                      
 let and_ ls = List.fold_left (fun x y -> And (x, y)) (cBool true) ls
                              
 let ueUpstream = function
-  | UVRef _ -> []
+  | UVRef (UV (_, _, _)) -> []
+  | UVRef (UVArray (_, a)) -> [a]
+  | UVRef (UVExtern (_, _)) -> []
   | UConst _ -> []
   | UAdd (a, b) -> [a; b]
   | USub (a, b) -> [a; b]
@@ -228,7 +264,13 @@ let uvUpstream u =
   erase (col u)
         
 let not_ a = Not a
-                 
+let (@!) : type a b. a tArray -> b e -> a v =
+  fun arr ind -> match arr with
+                 | A (uav, t) -> V (UVArray (uav, uecv ind), t)
+                                 
+let (@!.) : type a b. a tArray -> b e -> a e =
+  fun arr ind -> VRef (arr @! ind)
+                      
 let (==.) a b = Eq (a, b)
 let (/=.) a b = not_ (a ==. b)
 let (<.) a b = Lt (a, b)
