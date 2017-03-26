@@ -62,17 +62,15 @@ type uv =
  and ue =
    | UVRef of uv
    | UConst of const
-   | UAdd of (ue * ue)
-   | USub of (ue * ue)
-   | UMul of (ue * ue)
-   | UDiv of (ue * ue)
-   | UMod of (ue * ue)
-   | UNot of ue
-   | UAnd of ue list
-   | UEq of (ue * ue)
-   | ULt of (ue * ue)
+   | UAdd of (ue * ue) | USub of (ue * ue) | UMul of (ue * ue)
+   | UDiv of (ue * ue) | UMod of (ue * ue)
+   | UNot of ue | UAnd of ue list | UEq of (ue * ue) | ULt of (ue * ue)
+   | UBnot of ue | UBand of (ue * ue) | UBor of (ue * ue)
+   | UBxor of (ue * ue) | UBsl of (ue * ue) | UBsr of (ue * ue)
    | UMux of (ue * ue * ue)
-   | UPow of (ue * ue)
+   | UExp of ue | ULog of ue | USqrt of ue | UPow of (ue * ue)
+   | USin of ue | UCos of ue | UTan of ue
+   | UAsin of ue | UAcos of ue | UAtan of ue
                
 type 'a v = V : uv * 'a typ -> 'a v
                                   
@@ -88,7 +86,19 @@ type 'a e =
   | And : bool e * bool e -> bool e
   | Eq : 'a e * 'a e -> bool e
   | Lt : 'a e * 'a e -> bool e
+  | Bnot : 'a e -> 'a e
+  | Band : 'a e * 'a e -> 'a e
+  | Bor : 'a e * 'a e -> 'a e
+  | Bxor : 'a e * 'a e -> 'a e
+  | Bsl : 'a e * 'a e -> 'a e
+  | Bsr : 'a e * 'a e -> 'a e
   | Mux : bool e * 'a e * 'a e -> 'a e
+  | Exp : float e -> float e
+  | Log : float e -> float e
+  | Sqrt : float e -> float e
+  | Sin : float e -> float e | Asin : float e -> float e
+  | Cos : float e -> float e | Acos : float e -> float e
+  | Tan : float e -> float e | Atan : float e -> float e
   | Pow : float e * float e -> float e
                                      
 module Type_ua :
@@ -125,9 +135,24 @@ TYPE with type t = ue = struct
                    | UMod (a, _) -> typeOfM a
                    | UNot _ -> Bool
                    | UAnd _ -> Bool
+                   | UBnot a -> typeOfM a
+                   | UBand (a, _) -> typeOfM a
+                   | UBor (a, _) -> typeOfM a
+                   | UBxor (a, _) -> typeOfM a
+                   | UBsl (a, _) -> typeOfM a
+                   | UBsr (a, _) -> typeOfM a
                    | UEq (_, _) -> Bool
                    | ULt (_, _) -> Bool
                    | UMux (_, a, _) -> typeOfM a
+                   | UExp a -> typeOfM a
+                   | ULog a -> typeOfM a
+                   | USqrt a -> typeOfM a
+                   | USin a -> typeOfM a
+                   | UAsin a -> typeOfM a
+                   | UCos a -> typeOfM a
+                   | UAcos a -> typeOfM a
+                   | UTan a -> typeOfM a
+                   | UAtan a -> typeOfM a
                    | UPow (a, _) -> typeOfM a
                end
                           
@@ -215,12 +240,29 @@ let rec uecv : type a. a e -> ue = function
                                  | Mod (a, b) -> UMod ((uecv a), (uecv b))
                                  | Not a -> unot (uecv a)
                                  | And (a, b) -> uand (uecv a) (uecv b)
+                                 | Bnot a -> UBnot (uecv a)
+                                 | Band (a, b) -> UBand (uecv a, uecv b)
+                                 | Bor (a, b) -> UBor (uecv a, uecv b)
+                                 | Bxor (a, b) -> UBxor (uecv a, uecv b)
+                                 | Bsl (a, b) -> UBsl (uecv a, uecv b)
+                                 | Bsr (a, b) -> UBsr (uecv a, uecv b)
                                  | Eq (a, b) -> ueq (uecv a) (uecv b)
                                  | Lt (a, b) -> ult (uecv a) (uecv b)
                                  | Mux (a, b, c) -> umux (uecv a) (uecv b) (uecv c)
+                                 | Exp a -> UExp (uecv a)
+                                 | Log a -> ULog (uecv a)
+                                 | Sqrt a -> USqrt (uecv a)
+                                 | Sin a -> USin (uecv a)
+                                 | Cos a -> UCos (uecv a)
+                                 | Asin a -> UAsin (uecv a)
+                                 | Acos a -> UAcos (uecv a)
+                                 | Tan a -> UTan (uecv a)
+                                 | Atan a -> UAtan (uecv a)
                                  | Pow (a, b) -> UPow ((uecv a), (uecv b))
                                                       
 let uvcv (V (v, _)) = v
+                        
+let typeE expr = typeOf typeUE (uecv expr)
                         
 let cInt x = Const (Int, x)
 let cInt64 x = Const (Int64, Int64.of_int x)
@@ -248,9 +290,24 @@ let ueUpstream = function
   | UMod (a, b) -> [a; b]
   | UNot a -> [a]
   | UAnd a -> a
+  | UBnot a -> [a]
+  | UBand (a, b) -> [a; b]
+  | UBor (a, b) -> [a; b]
+  | UBxor (a, b) -> [a; b]
+  | UBsl (a, b) -> [a; b]
+  | UBsr (a, b) -> [a; b]
   | UEq (a, b) -> [a; b]
   | ULt (a, b) -> [a; b]
   | UMux (a, b, c) -> [a; b; c]
+  | UExp a -> [a]
+  | ULog a -> [a]
+  | USqrt a -> [a]
+  | USin a -> [a]
+  | UAsin a -> [a]
+  | UCos a -> [a]
+  | UAcos a -> [a]
+  | UTan a -> [a]
+  | UAtan a -> [a]
   | UPow (a, b) -> [a; b]
 
 let uvUpstream u =
@@ -262,27 +319,54 @@ let uvUpstream u =
     | UVRef u -> [u]
     | u -> List.flatten (List.map col (ueUpstream u)) in
   erase (col u)
-        
+
+let wholeNumber : etype list = [Int; Int8; Int16; Int32; Int64; UInt8; UInt16; UInt32; UInt64]
+let comparable : etype list = Float :: wholeNumber
+
+let print_etype : etype -> string =
+  fun t -> match t with
+           | Int -> "Int" | Bool -> "Bool" | Float -> "Float"
+           | Int8 -> "Int8" | Int16 -> "Int16" | Int32 -> "Int32" | Int64 -> "Int64"
+           | UInt8 -> "UInt8" | UInt16 -> "UInt16" | UInt32 -> "UInt32" | UInt64 -> "UInt64"
+
+let formatError f e a = Printf.sprintf "%s expected argument of type %s. Type %s is not compatible with type %s" f e a e
+            
+let with_check_type f ls arg msg =
+  let t = typeE arg in
+  if List.mem t ls then f else failwith (msg (print_etype t))
+                            
 let not_ a = Not a
-let (@!) : type a b. a tArray -> b e -> a v =
-  fun arr ind -> match arr with
-                 | A (uav, t) -> V (UVArray (uav, uecv ind), t)
-                                 
+let (@!) arr ind =
+  with_check_type
+    (match arr with
+     | A (uav, t) -> V (UVArray (uav, uecv ind), t)) wholeNumber ind
+    (formatError "Indexing" "in whole number class")
+                                           
 let (@!.) : type a b. a tArray -> b e -> a e =
   fun arr ind -> VRef (arr @! ind)
                       
 let (==.) a b = Eq (a, b)
 let (/=.) a b = not_ (a ==. b)
-let (<.) a b = Lt (a, b)
-let (>.) a b = Lt (b, a)
+let (<.) a b = with_check_type (Lt (a, b)) comparable a (formatError "Compare function" "in Comparable class")
+let (>.) a b = b <. a
 let (<=.) a b = not_ (a >. b)
 let (>=.) a b = not_ (a <. b)
-let (@+) a b = Add (a, b)
-let (@-) a b = Sub (a, b)
-let (@/) a b = Div (a, b)
-let (@++) a b = Mul (a, b)
-let (@*+) a b = Pow (a, b)
-let div_ a b = Div (a, b)
-let mod_ a b = Mod (a, b)
+let (@+) a b = with_check_type (Add (a, b)) comparable a (formatError "@+" "in Comparable class")
+let (@-) a b = with_check_type (Sub (a, b)) comparable a (formatError "@-" "in Comparable class")
+let (@/) a b = with_check_type (Div (a, b)) comparable a (formatError "@/" "in Comparable class")
+let (@++) a b = with_check_type (Mul (a, b)) comparable a (formatError "Multiply: @++" "in Comparable class")
+let (@*+) a b = with_check_type (Pow (a, b)) comparable a (formatError "Power: @*+" "in Comparable class")
+
+let bnot a = with_check_type (Bnot a) wholeNumber a (formatError "Bitwise not: @~" "in whole number class")
+                                                                 
+let (@&) a b = with_check_type (Band (a, b)) wholeNumber a (formatError "Bitwise and: @&" "in whole number class")
+let (@|) a b = with_check_type (Bor (a, b)) wholeNumber a (formatError "Bitwise or: @|" "in whole number class")
+let (@^) a b = with_check_type (Bxor (a, b)) wholeNumber a (formatError "Bitwise xor: @^" "in whole number class")
+let (@>>) a b = with_check_type (Bsr (a, b)) wholeNumber a (formatError "Shift right: @>>" "in whole number class")
+let (<<@) a b = with_check_type (Bsl (a, b)) wholeNumber a (formatError "Shift left: <<@" "in whole number class")
+                               
+let div_ a b = with_check_type (Div (a, b)) comparable a (formatError "Divide" "in Comparable class")
+let mod_ a b = with_check_type (Mod (a, b)) wholeNumber a (formatError "Modulus" "in Comparable class")
+                               
 let value a = VRef a
 let mux a b c = Mux (a, b, c)
