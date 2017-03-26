@@ -2,43 +2,45 @@ open Corenode
 open TypeExpr
        
 let node name design =
-  addName name
-  >>= fun name' -> get >>=
-    fun (g1, parent) ->
-    let (a, (g2, child)) = addNode { g1 with gNameList = [] } name' design in
+  do_
+  ; name' <-- addName name
+  ; (g1, parent) <-- get
+  ; let (a, (g2, child)) = addNode { g1 with gNameList = [] } name' design in
     put ({ g2 with gNameList = g1.gNameList @ [NameH (name, g2.gNameList)] } ,
          { parent with nodeSubs = parent.nodeSubs @ [child] })
-    >>= fun _ -> ret a
-                   
+    ; return a
+             
 let period p n =
-  match p with
-  | num when num <= 0 -> raise (Failure "Period must be greater than 0")
-  | _ ->
-     get >>= fun (g, a) ->
-     put ({ g with gPeriod = p }, a)
-     >>= fun _ -> n >>= fun r -> get
-     >>= fun (g', a') -> put ({ g' with gPeriod = g.gPeriod }, a')
-     >>= fun _ -> ret r
+  let _ = assert ( p > 0) in
+  (do_
+  ; (g, a) <-- get
+  ; put ({ g with gPeriod = p }, a)
+  ; r <-- n
+  ; (g', a') <-- get
+  ; put ({ g' with gPeriod = g.gPeriod }, a')
+  ; return r)
                     
 let phase p n =
-  get >>= fun (g, a) ->
-  match p with
-  | num when num >= g.gPeriod -> raise (Failure "Phase must be less than period")
-  | _ ->
-     put ({ g with gPhase = p }, a)
-     >>= fun _ -> n >>= fun r -> get
-     >>= fun (g', a) -> put ({ g' with gPhase = g.gPhase }, a)
-     >>= fun _ -> ret r
+  do_
+  ; (g, a) <-- get
+  ; if p >= g.gPeriod then raise (Failure "Phase must be less than period")
+    else
+      (do_
+      ; put ({ g with gPhase = p }, a)
+      ; r <-- n
+      ; (g', a') <-- get
+      ; put ({ g' with gPhase = g.gPhase }, a')
+      ; return r)
                       
 let var name t init =
-  addName name
-  >>= fun name' -> get >>=
-    fun (g, cur) ->
-    let c = constant t init in
+  do_
+  ; name' <-- addName name
+  ; (g, cur) <-- get
+  ; let c = constant t init in
     let uv' = UV (g.gVarId, name', c) in
     put ({ g with gVarId = g.gVarId + 1;
                   gNameList = g.gNameList @ [NameVar (name, c)] }, cur)
-    >>= fun _ -> ret (V (uv', t))
+    ; return (V (uv', t))
                    
 let var' : type a. string -> a typ -> a v =
   fun name t -> V ((UVExtern (name, typeTag t)), t)
@@ -46,14 +48,15 @@ let var' : type a. string -> a typ -> a v =
 let array name t ls =
   match ls with
   | [] -> raise (Failure "Array cannot be empty")
-  | _ -> addName name
-         >>= fun name' -> get >>=
-           fun (g, cur) ->
-           let c = List.map (constant t) ls in
-           let arr = UA (g.gArrayId, name', c) in
-           put ({ g with gArrayId = g.gArrayId + 1;
-                         gNameList = g.gNameList @ [NameArray (name, c)] }, cur)
-           >>= fun _ -> ret (A (arr, t))
+  | _ ->
+     do_
+    ; name' <-- addName name
+    ; (g, cur) <-- get
+    ; let c = List.map (constant t) ls in
+      let arr = UA (g.gArrayId, name', c) in
+      put ({ g with gArrayId = g.gArrayId + 1;
+                    gNameList = g.gNameList @ [NameArray (name, c)] }, cur)
+      ; return (A (arr, t))
                           
 let array' : type a. string -> a typ -> a tArray =
   fun name t -> A ((UAExtern (name, typeTag t)), t)

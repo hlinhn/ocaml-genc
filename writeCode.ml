@@ -20,8 +20,10 @@ let globalClk = "__global_clock"
                   
 let cType : etype -> string = function
   | Bool -> "bool" | Int -> "int"
-  | Int64 -> "int64_t" | Int32 -> "int32_t" | Int16 -> "int16_t" | Int8 -> "int8_t"
-  | UInt64 -> "uint64_t" | UInt32 -> "uint32_t" | UInt16 -> "uint16_t" | UInt8 -> "uint8_t"
+  | Int64 -> "int64_t" | Int32 -> "int32_t"
+  | Int16 -> "int16_t" | Int8 -> "int8_t"
+  | UInt64 -> "uint64_t" | UInt32 -> "uint32_t"
+  | UInt16 -> "uint16_t" | UInt8 -> "uint8_t"
   | Float -> "float"
                
 let print_const c =

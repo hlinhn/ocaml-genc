@@ -16,7 +16,8 @@ module type TYPE = sig
 end
 type 'a type_impl = (module TYPE with type t = 'a)                      
                       
-let typeOf : 'a type_impl -> 'a -> etype =                                        fun (type a) (find_type : a type_impl) (x : a) ->
+let typeOf : 'a type_impl -> 'a -> etype =
+  fun (type a) (find_type : a type_impl) (x : a) ->
   let module Type = (val find_type : TYPE with type t = a) in
   Type.typeOfM x
                
@@ -30,10 +31,8 @@ TYPE with type t = const = struct
                    | CWord16 _ -> UInt16 | CWord8 _ -> UInt8
                    | CFloat _ -> Float
                end
-let typeConst : const type_impl =
-  (module Type_const : TYPE with type t = const)
+let typeConst : const type_impl = (module Type_const : TYPE with type t = const)
 
-    
 type _ typ =
   | Int64 : int64 typ | Int32 : int32 typ | Int16 : int16 typ | Int8 : int8 typ
   | UInt64 : uint64 typ | UInt32 : uint32 typ | UInt16 : uint16 typ | UInt8 : uint8 typ
@@ -119,8 +118,7 @@ TYPE with type t = uv = struct
                    | UVArray (a, _) -> typeOf typeUa a
                    | UVExtern (_, a) -> a
                end             
-let typeUV : uv type_impl =
-  (module Type_uv : TYPE with type t = uv)
+let typeUV : uv type_impl = (module Type_uv : TYPE with type t = uv)
     
 module Type_ue :
 TYPE with type t = ue = struct
@@ -159,13 +157,13 @@ TYPE with type t = ue = struct
 let typeUE : ue type_impl =
   (module Type_ue : TYPE with type t = ue)
     
-let constant : type a. a typ -> a -> const =
-  fun t x -> match t with
-             | Int64 -> CInt64 x | Int32 -> CInt32 x | Int16 -> CInt16 x
-             | Int8 -> CInt8 x | UInt64 -> CWord64 x | UInt32 -> CWord32 x
-             | UInt16 -> CWord16 x | UInt8 -> CWord8 x
-             | Bool -> CBool x | Int -> CInt x
-             | Float -> CFloat x
+let constant : type a. a typ -> a -> const = fun t x ->
+  match t with
+  | Int64 -> CInt64 x | Int32 -> CInt32 x | Int16 -> CInt16 x
+  | Int8 -> CInt8 x | UInt64 -> CWord64 x | UInt32 -> CWord32 x
+  | UInt16 -> CWord16 x | UInt8 -> CWord8 x
+  | Bool -> CBool x | Int -> CInt x
+  | Float -> CFloat x
                                
 let ubool (a : bool) = UConst (CBool a)
 let unot = function
@@ -187,7 +185,7 @@ let uand a b =
     | _, _ -> reduceAnd [a; b]
                         
 let ueq a b =
-  if a == b then (ubool true)
+  if a = b then (ubool true)
   else
     match a, b with
     | (UConst (CBool a), UConst (CBool b)) -> ubool (a == b)
@@ -204,7 +202,7 @@ let ueq a b =
     | _, _ -> UEq (a, b)
                   
 let ult a b =
-  if a == b then (ubool false)
+  if a = b then (ubool false)
   else
     match a, b with
     | (UConst (CBool a), UConst (CBool b)) -> ubool (a < b)
@@ -224,42 +222,43 @@ let rec umux b t f =
   match b, t, f with
   | ((UConst (CBool b1)), t, f) -> if b1 then t else f
   | ((UNot b1), t, f) -> umux b1 f t
-  | (b1, (UMux (b2, t1, _)), f) -> if b1 == b2 then umux b1 t1 f
+  | (b1, (UMux (b2, t1, _)), f) -> if b1 = b2 then umux b1 t1 f
                                    else umux b t f
-  | (b1, t, (UMux (b2, _, f1))) -> if b1 == b2 then umux b1 t f1
+  | (b1, t, (UMux (b2, _, f1))) -> if b1 = b2 then umux b1 t f1
                                    else umux b t f
   | (_, _, _) -> UMux (b, t, f)
                       
-let rec uecv : type a. a e -> ue = function
-                                 | VRef (V (v, _)) -> UVRef v
-                                 | Const (a, b) -> UConst (constant a b)
-                                 | Add (a, b) -> UAdd ((uecv a), (uecv b))
-                                 | Sub (a, b) -> USub ((uecv a), (uecv b))
-                                 | Mul (a, b) -> UMul ((uecv a), (uecv b))
-                                 | Div (a, b) -> UDiv ((uecv a), (uecv b))
-                                 | Mod (a, b) -> UMod ((uecv a), (uecv b))
-                                 | Not a -> unot (uecv a)
-                                 | And (a, b) -> uand (uecv a) (uecv b)
-                                 | Bnot a -> UBnot (uecv a)
-                                 | Band (a, b) -> UBand (uecv a, uecv b)
-                                 | Bor (a, b) -> UBor (uecv a, uecv b)
-                                 | Bxor (a, b) -> UBxor (uecv a, uecv b)
-                                 | Bsl (a, b) -> UBsl (uecv a, uecv b)
-                                 | Bsr (a, b) -> UBsr (uecv a, uecv b)
-                                 | Eq (a, b) -> ueq (uecv a) (uecv b)
-                                 | Lt (a, b) -> ult (uecv a) (uecv b)
-                                 | Mux (a, b, c) -> umux (uecv a) (uecv b) (uecv c)
-                                 | Exp a -> UExp (uecv a)
-                                 | Log a -> ULog (uecv a)
-                                 | Sqrt a -> USqrt (uecv a)
-                                 | Sin a -> USin (uecv a)
-                                 | Cos a -> UCos (uecv a)
-                                 | Asin a -> UAsin (uecv a)
-                                 | Acos a -> UAcos (uecv a)
-                                 | Tan a -> UTan (uecv a)
-                                 | Atan a -> UAtan (uecv a)
-                                 | Pow (a, b) -> UPow ((uecv a), (uecv b))
-                                                      
+let rec uecv : type a. a e -> ue =
+  function
+  | VRef (V (v, _)) -> UVRef v
+  | Const (a, b) -> UConst (constant a b)
+  | Add (a, b) -> UAdd ((uecv a), (uecv b))
+  | Sub (a, b) -> USub ((uecv a), (uecv b))
+  | Mul (a, b) -> UMul ((uecv a), (uecv b))
+  | Div (a, b) -> UDiv ((uecv a), (uecv b))
+  | Mod (a, b) -> UMod ((uecv a), (uecv b))
+  | Not a -> unot (uecv a)
+  | And (a, b) -> uand (uecv a) (uecv b)
+  | Bnot a -> UBnot (uecv a)
+  | Band (a, b) -> UBand (uecv a, uecv b)
+  | Bor (a, b) -> UBor (uecv a, uecv b)
+  | Bxor (a, b) -> UBxor (uecv a, uecv b)
+  | Bsl (a, b) -> UBsl (uecv a, uecv b)
+  | Bsr (a, b) -> UBsr (uecv a, uecv b)
+  | Eq (a, b) -> ueq (uecv a) (uecv b)
+  | Lt (a, b) -> ult (uecv a) (uecv b)
+  | Mux (a, b, c) -> umux (uecv a) (uecv b) (uecv c)
+  | Exp a -> UExp (uecv a)
+  | Log a -> ULog (uecv a)
+  | Sqrt a -> USqrt (uecv a)
+  | Sin a -> USin (uecv a)
+  | Cos a -> UCos (uecv a)
+  | Asin a -> UAsin (uecv a)
+  | Acos a -> UAcos (uecv a)
+  | Tan a -> UTan (uecv a)
+  | Atan a -> UAtan (uecv a)
+  | Pow (a, b) -> UPow ((uecv a), (uecv b))
+                       
 let uvcv (V (v, _)) = v
                         
 let typeE expr = typeOf typeUE (uecv expr)
@@ -323,11 +322,11 @@ let uvUpstream u =
 let wholeNumber : etype list = [Int; Int8; Int16; Int32; Int64; UInt8; UInt16; UInt32; UInt64]
 let comparable : etype list = Float :: wholeNumber
 
-let print_etype : etype -> string =
-  fun t -> match t with
-           | Int -> "Int" | Bool -> "Bool" | Float -> "Float"
-           | Int8 -> "Int8" | Int16 -> "Int16" | Int32 -> "Int32" | Int64 -> "Int64"
-           | UInt8 -> "UInt8" | UInt16 -> "UInt16" | UInt32 -> "UInt32" | UInt64 -> "UInt64"
+let print_etype : etype -> string = fun t ->
+  match t with
+  | Int -> "Int" | Bool -> "Bool" | Float -> "Float"
+  | Int8 -> "Int8" | Int16 -> "Int16" | Int32 -> "Int32" | Int64 -> "Int64"
+  | UInt8 -> "UInt8" | UInt16 -> "UInt16" | UInt32 -> "UInt32" | UInt64 -> "UInt64"
 
 let formatError f e a = Printf.sprintf "%s expected argument of type %s. Type %s is not compatible with type %s" f e a e
             

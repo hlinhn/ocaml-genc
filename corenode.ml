@@ -51,11 +51,14 @@ type 'a node = Node of (nodeSt -> ('a * nodeSt))
                          
 let get = Node (fun s -> (s, s))
 let put (s : nodeSt) = Node (fun _ -> ((), s))
-let ret a = Node (fun s -> (a, s))
+let return a = Node (fun s -> (a, s))
+
 let (>>=) (Node m) f = Node (fun s ->
                            let (a, s') = m s in
                            let (Node m') = f a in
                            m' s')
+let bind (Node m) f = (Node m) >>= f
+                                     
 let checkName name =
   if (String.length name) < 1 then raise (Failure "Name can't be empty")
   else
@@ -74,14 +77,14 @@ let checkName name =
     else raise (Failure "Not a valid identifier")
                
 let addName name =
-  get >>=
-    fun (g, cur) ->
-    let () = checkName name in
+  do_
+  ; (g, cur) <-- get
+  ; let () = checkName name in
     if List.mem name cur.nodeNames then raise (Failure "Name not unique in node")
     else
-      put (g, { cur with nodeNames = name :: cur.nodeNames} ) >>=
-        fun _ ->
-        ret (String.concat "." [cur.nodeName; name])
+      (do_
+      ; put (g, { cur with nodeNames = name :: cur.nodeNames} )
+      ; return (String.concat "." [cur.nodeName; name]))
             
 let addNode gstt name (Node a) =
   a ({ gstt with gRuleId = gstt.gRuleId + 1 },
