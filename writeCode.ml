@@ -5,15 +5,23 @@ open SortNode
 type config = { stateName : string;
                 funcName : string;
                 arduino : bool;
+                rosserial : bool;
                 cCode : (string * string);
                 inout : pinMode list;
+                libs : string list;
+                roshandles: handler;
               }
                 
+let defaultHandler = { id = ""; subs = []; pubs = [] }
+                       
 let defaultConf = { stateName = "state";
                     funcName = "";
                     arduino = false;
+                    rosserial = false;
                     cCode = ("", "");
                     inout = [];
+                    libs = [];
+                    roshandles = defaultHandler;
                   }
                     
 let globalClk = "__global_clock"
@@ -41,7 +49,22 @@ let print_const c =
   | CWord16 a -> Uint16.to_string a
   | CWord8 a -> Uint8.to_string a
   | CFloat a -> String.concat "" [Pervasives.string_of_float a; "F"]
-                              
+
+let publish ls =
+  String.concat "\n" (List.map (fun x -> Printf.sprintf "%s.publish(&%s);" x.pubid x.msg) ls.pubs)
+                
+let declareRos ls =
+  let subdecl = String.concat "\n" (List.map (fun x -> Printf.sprintf "ros::Subscriber<%s> %s(\"%s\", %s);" x.msg_type x.subid x.topic x.callback) ls.subs) in
+  let pubdecl = String.concat "\n" (List.map (fun x -> Printf.sprintf "ros::Publisher %s(\"%s\", &%s);" x.pubid x.topic x.msg) ls.pubs) in
+  String.concat "\n" [Printf.sprintf "ros::NodeHandle %s;" ls.id;
+                      subdecl; pubdecl]
+                
+let initRos ls =
+  let init = Printf.sprintf "   %s.initNode();" ls.id in
+  let initsub = String.concat "\n" (List.map (fun x -> Printf.sprintf "   %s.subscribe(%s);" ls.id x.subid) ls.subs) in
+  let initpub = String.concat "\n" (List.map (fun x -> Printf.sprintf "   %s.advertise(%s);" ls.id x.pubid) ls.pubs) in
+  String.concat "\n" ["{"; init; initsub; initpub; "}"]
+                                 
 let declarePins ls =
   let dPin p =
     match p with
@@ -50,7 +73,7 @@ let declarePins ls =
   String.concat "\n" (List.map dPin ls)
 
 let setupPins ls =
-  String.concat "\n" ["void setup() {"; declarePins ls; "}"]
+  String.concat "\n" ["{"; declarePins ls; "}"]
                 
 let declName def cNames =
   let rec checkEmpty = function
@@ -166,6 +189,11 @@ let codeUE conf exls ues s (ue_, n) =
 
   String.concat "" [checkUe ue_; s; cType (typeOf typeUE ue_); " "; n; " = "; String.concat "" basic; ";\n"]
                 
+let varExternName fuv =
+  match fuv with
+  | UVExtern (n, _) -> n
+  | _ -> failwith "Not supported getting name from other types of uv"
+                  
 let codeRule conf rule =
   let open ParseDecl in
   let ues = sortNode (allUEs rule) in
@@ -236,17 +264,22 @@ let codeTime (p, ph, rules) =
                  "   }";
                  "}"]
 
-                
+let setup conf =
+  let ard = if conf.arduino then setupPins conf.inout else "" in
+  let ros = if conf.rosserial then initRos conf.roshandles else "" in
+  let other = String.concat ";\n" (conf.libs@[""]) in
+  if conf.arduino then Printf.sprintf "void setup() {\n%s\n%s\n%s\n}" ard other ros else ""
+
 let writeOut name conf cNames rules sched =
-  let ard = if conf.arduino then setupPins conf.inout
-            else "" in
+  let setup_string = setup conf in
   let extra = "#include <stdint.h>\n#include <assert.h>" in
-  let inclArd = if conf.arduino then "#define NDEBUG" else "" in
+  let inclRos = if conf.rosserial then "#include <ros.h>" else "" in 
+  let declRos = if conf.rosserial then declareRos conf.roshandles else "" in
   let c =
-    String.concat "\n" (extra :: inclArd :: (fst conf.cCode)
+    String.concat "\n" (extra :: inclRos :: (fst conf.cCode)
                         :: (String.concat " " ["static"; cType UInt64; globalClk; "=0;"])
                         :: (declName true (NameH (conf.stateName, [cNames])))
-                        :: ard
+                        :: declRos :: setup_string
                         :: (List.map (fun x -> codeRule conf x) rules)
                         @ [(Printf.sprintf "void %s() {" name)]
                         @ (List.map (fun x -> codeTime x) sched)

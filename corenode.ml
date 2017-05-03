@@ -18,12 +18,16 @@ type globalSt = { gRuleId:int;
                   gPeriod:int;
                   gPhase :int
                 }
+                  
 type pinMode =
   | DIn of int
   | DOut of int
   | AIn of int
   | AOut of int
-                  
+              
+type subscribe = { subid: name; topic: name; msg_type: string; callback: name }
+type publish = { pubid: name; topic: name; msg: string }
+type handler = { id: name; subs: subscribe list; pubs: publish list }                  
 type nodeDt = { nodeId     :int;
                 nodeName   :name;
                 nodeNames  :name list;

@@ -86,3 +86,4 @@ let writePin p elem =
   | AIn _ | DIn _ -> failwith "Expecting output pin"
   | _ -> get >>= fun (g, n) ->
          put (g, { n with nodeInout = n.nodeInout @ [(p, elem)] })
+  
